@@ -60,7 +60,25 @@ jobs:
       - name: Install Flaskr (keeping Flask from the wheel)
         run: |
           VENV="$RUNNER_TEMP/venv/bin"
-          BEFORE=$("$VENV/python" -c "import importlib.metadata as m; print(m.version('flask'))")
+          BEFORE=$("$VENV/pip" show flask | awk '/^Version:/ {print $2}')
           "$VENV/pip" install --no-deps ./examples/tutorial
-          AFTER=$("$VENV/python" -c "import importlib.metadata as m; print(m.version('flask'))")
-          echo "Flask before: $BEFORE, after:
+          AFTER=$("$VENV/pip" show flask | awk '/^Version:/ {print $2}')
+          echo "Flask before: $BEFORE, after: $AFTER"
+          test "$BEFORE" = "$AFTER"
+          "$VENV/pip" list
+
+      - name: Initialize Flaskr database
+        run: |
+          "$RUNNER_TEMP/venv/bin/flask" --app flaskr init-db
+
+      - name: Run Flaskr on port 5000
+        run: |
+          nohup "$RUNNER_TEMP/venv/bin/flask" --app flaskr run --host 0.0.0.0 --port 5000 > flaskr.log 2>&1 &
+          for i in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:5000/ > /dev/null; then
+              echo "Flaskr is up on port 5000"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Flaskr failed to start"; cat flaskr.log; exit 1
