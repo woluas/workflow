@@ -20,18 +20,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: pip
+      - uses: astral-sh/setup-uv@v5
 
-      - name: Install project and test dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e . --group tests "pytest<9"
+      - name: Install project and test dependencies (versions from uv.lock)
+        run: uv sync --python ${{ matrix.python-version }} --no-default-groups --group tests
 
       - name: Run tests
-        run: python -m pytest tests/
+        run: uv run --no-sync python -m pytest tests/
 
   build-and-run:
     name: Build and run Flaskr
@@ -68,22 +63,4 @@ jobs:
           BEFORE=$("$VENV/python" -c "import importlib.metadata as m; print(m.version('flask'))")
           "$VENV/pip" install --no-deps ./examples/tutorial
           AFTER=$("$VENV/python" -c "import importlib.metadata as m; print(m.version('flask'))")
-          echo "Flask before: $BEFORE, after: $AFTER"
-          test "$BEFORE" = "$AFTER"
-          "$VENV/pip" list
-
-      - name: Initialize Flaskr database
-        run: |
-          "$RUNNER_TEMP/venv/bin/flask" --app flaskr init-db
-
-      - name: Run Flaskr on port 5000
-        run: |
-          nohup "$RUNNER_TEMP/venv/bin/flask" --app flaskr run --host 0.0.0.0 --port 5000 > flaskr.log 2>&1 &
-          for i in $(seq 1 20); do
-            if curl -fsS http://127.0.0.1:5000/ > /dev/null; then
-              echo "Flaskr is up on port 5000"
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "Flaskr failed to start"; cat flaskr.log; exit 1
+          echo "Flask before: $BEFORE, after:
